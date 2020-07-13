@@ -48,6 +48,7 @@ import org.apache.druid.segment.data.IndexedInts;
 import org.apache.druid.segment.incremental.IncrementalIndexStorageAdapter;
 import org.apache.druid.segment.serde.ComplexMetricSerde;
 import org.apache.druid.segment.serde.ComplexMetrics;
+import org.apache.druid.segment.serde.UnsupportedColumnTypeException;
 import org.joda.time.DateTime;
 import org.joda.time.Interval;
 
@@ -117,32 +118,36 @@ public class SegmentAnalyzer
 
       final ColumnAnalysis analysis;
       final ValueType type = capabilities.getType();
-      switch (type) {
-        case LONG:
-          analysis = analyzeNumericColumn(capabilities, length, Long.BYTES);
-          break;
-        case FLOAT:
-          analysis = analyzeNumericColumn(capabilities, length, NUM_BYTES_IN_TEXT_FLOAT);
-          break;
-        case DOUBLE:
-          analysis = analyzeNumericColumn(capabilities, length, Double.BYTES);
-          break;
-        case STRING:
-          if (index != null) {
-            analysis = analyzeStringColumn(capabilities, columnHolder);
-          } else {
-            analysis = analyzeStringColumn(capabilities, storageAdapter, columnName);
-          }
-          break;
-        case COMPLEX:
-          analysis = analyzeComplexColumn(capabilities, columnHolder, storageAdapter.getColumnTypeName(columnName));
-          break;
-        default:
-          log.warn("Unknown column type[%s].", type);
-          analysis = ColumnAnalysis.error(StringUtils.format("unknown_type_%s", type));
+      try {
+        switch (type) {
+          case LONG:
+            analysis = analyzeNumericColumn(capabilities, length, Long.BYTES);
+            break;
+          case FLOAT:
+            analysis = analyzeNumericColumn(capabilities, length, NUM_BYTES_IN_TEXT_FLOAT);
+            break;
+          case DOUBLE:
+            analysis = analyzeNumericColumn(capabilities, length, Double.BYTES);
+            break;
+          case STRING:
+            if (index != null) {
+              analysis = analyzeStringColumn(capabilities, columnHolder);
+            } else {
+              analysis = analyzeStringColumn(capabilities, storageAdapter, columnName);
+            }
+            break;
+          case COMPLEX:
+            analysis = analyzeComplexColumn(capabilities, columnHolder, storageAdapter.getColumnTypeName(columnName));
+            break;
+          default:
+            log.warn("Unknown column type[%s].", type);
+            analysis = ColumnAnalysis.error(StringUtils.format("unknown_type_%s", type));
+        }
+        columns.put(columnName, analysis);
+      } catch (UnsupportedColumnTypeException e) {
+        log.warn("%s for column [%s].", e.getMessage(), columnName);
+        columns.put(columnName, ColumnAnalysis.error(StringUtils.format("unsupported_type_%s", type)));
       }
-
-      columns.put(columnName, analysis);
     }
 
     // Add time column too

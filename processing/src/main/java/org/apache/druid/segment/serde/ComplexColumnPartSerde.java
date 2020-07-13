@@ -79,6 +79,10 @@ public class ComplexColumnPartSerde implements ColumnPartSerde
     return (buffer, builder, columnConfig) -> {
       if (serde != null) {
         serde.deserializeColumn(buffer, builder);
+      } else {
+        builder.setComplexColumnSupplier(() -> {
+          throw new UnsupportedColumnTypeException("Unsupported type %s", this.typeName);
+        });
       }
     };
   }
